@@ -1,0 +1,1 @@
+用AI做的epub阅读器（功能只有“像网页一样读epub”，但是是直接类静态网页读的所以我可以用firefox的highlight by trix。然后因为搭载到github上了我就能用之前弄的暴力猴插件（因为暴力猴不能用在本地页面上）https://greasyfork.org/zh-CN/scripts/560437-gemini-tts-reader ，然后配合沙拉单词做anki卡（你别做anki卡了你背了多少）
