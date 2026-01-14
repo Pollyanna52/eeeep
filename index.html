@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Native Reader</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        :root {
+            --bg: #ffffff;
+            --text: #1a1a1a;
+            --ui-bg: #ffffff;
+            --border: #eeeeee;
+            --sidebar-width: 280px;
+        }
+
+        [data-theme="dark"] {
+            --bg: #121212;
+            --text: #d1d1d1;
+            --ui-bg: #1a1a1a;
+            --border: #2c2c2c;
+        }
+
+        body {
+            margin: 0; padding: 0;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+            line-height: 1.8;
+            transition: background 0.3s;
+        }
+
+        /* 极简上传页 */
+        #upload-page {
+            display: flex; justify-content: center; align-items: center; height: 100vh;
+        }
+        .upload-box {
+            width: 280px; padding: 40px; border: 1px solid var(--border); text-align: center;
+        }
+
+        /* 阅读界面布局 */
+        #reader-page { display: none; }
+
+        .nav-bar {
+            position: fixed; top: 0; width: 100%; height: 50px;
+            background: var(--ui-bg); border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; padding: 0 20px; z-index: 1000;
+        }
+
+        /* 侧边栏目录 */
+        #sidebar {
+            position: fixed; left: 0; top: 50px; bottom: 0; width: var(--sidebar-width);
+            background: var(--ui-bg); border-right: 1px solid var(--border);
+            overflow-y: auto; display: none; padding: 20px; z-index: 999;
+        }
+
+        .toc-link {
+            display: block; padding: 12px 0; border-bottom: 1px solid var(--border);
+            cursor: pointer; text-decoration: none; color: var(--text); font-size: 14px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .toc-link:hover { color: #007aff; }
+
+        /* 内容正文区 */
+        #content-area {
+            max-width: 750px; margin: 80px auto; padding: 0 20px 100px 20px;
+            font-size: 18px;
+        }
+
+        /* 修正内容中的图片 */
+        #content-area img {
+            max-width: 100%; height: auto; display: block; margin: 20px auto;
+        }
+
+        /* 按钮样式 */
+        .btn {
+            padding: 6px 14px; border: 1px solid var(--border);
+            background: var(--bg); color: var(--text); cursor: pointer;
+            margin-right: 10px; border-radius: 4px; font-size: 13px;
+        }
+        .btn:hover { background: var(--border); }
+
+        /* 适配：内容中的 ID 跳转目标增加偏移，防止被顶部导航拦挡住 */
+        section[id], div[id], p[id], span[id] {
+            scroll-margin-top: 70px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="upload-page">
+        <div class="upload-box">
+            <input type="file" id="file-input" accept=".epub">
+        </div>
+    </div>
+
+    <div id="reader-page">
+        <div class="nav-bar">
+            <button class="btn" onclick="toggleTOC()">☰ 目录</button>
+            <button class="btn" onclick="toggleTheme()">🌓 模式</button>
+            <button class="btn" onclick="location.reload()">退出</button>
+            <span id="book-title" style="font-size: 14px; opacity: 0.6; margin-left: 10px;"></span>
+        </div>
+        
+        <div id="sidebar">
+            <h3 style="font-size: 16px;">目录</h3>
+            <div id="toc-list"></div>
+        </div>
+
+        <article id="content-area"></article>
+    </div>
+
+    <script>
+        let blobs = {}; // 存储解压出的资源 URL
+
+        document.getElementById('file-input').onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                const zip = await JSZip.loadAsync(file);
+                document.getElementById('upload-page').style.display = 'none';
+                document.getElementById('reader-page').style.display = 'block';
+
+                // 1. 预处理：将所有非 HTML 文件（图片/CSS等）转为 Blob URL
+                for (let filename in zip.files) {
+                    const fileData = zip.files[filename];
+                    if (!fileData.dir) {
+                        const content = await fileData.async('blob');
+                        blobs[filename] = URL.createObjectURL(content);
+                    }
+                }
+
+                // 2. 解析电子书结构
+                const opfPath = await findOPF(zip);
+                const baseDir = opfPath.substring(0, opfPath.lastIndexOf('/') + 1);
+                const opfText = await zip.file(opfPath).async('text');
+                const opfDoc = new DOMParser().parseFromString(opfText, "text/xml");
+
+                // 获取书名
+                const title = opfDoc.getElementsByTagName('dc:title')[0]?.textContent || "Unknown Title";
+                document.getElementById('book-title').innerText = title;
+
+                // 解析清单 (Manifest) 和 阅读顺序 (Spine)
+                const manifest = Array.from(opfDoc.getElementsByTagName('item'));
+                const itemrefs = Array.from(opfDoc.getElementsByTagName('itemref'));
+                const manifestMap = {};
+                manifest.forEach(item => {
+                    manifestMap[item.getAttribute('id')] = item.getAttribute('href');
+                });
+
+                const container = document.getElementById('content-area');
+                const tocList = document.getElementById('toc-list');
+
+                // 3. 按顺序加载并注入 HTML
+                for (let ref of itemrefs) {
+                    const id = ref.getAttribute('idref');
+                    const href = manifestMap[id];
+                    const fullPath = normalizePath(baseDir + href);
+                    
+                    if (zip.file(fullPath)) {
+                        let htmlText = await zip.file(fullPath).async('text');
+                        
+                        const section = document.createElement('section');
+                        section.id = href; // 关键：用文件名做 ID，方便链接跳转
+                        
+                        // 替换内容中的相对资源
+                        section.innerHTML = processHTML(htmlText, baseDir);
+                        container.appendChild(section);
+
+                        // 简单的目录项：取第一个标题或文件名
+                        const firstHeading = section.querySelector('h1, h2, h3');
+                        const link = document.createElement('a');
+                        link.className = 'toc-link';
+                        link.innerText = firstHeading ? firstHeading.innerText.trim() : href;
+                        link.onclick = () => {
+                            section.scrollIntoView({ behavior: 'smooth' });
+                            toggleTOC();
+                        };
+                        tocList.appendChild(link);
+                    }
+                }
+
+                // 4. 修复：链接点击拦截器
+                container.addEventListener('click', (ev) => {
+                    const a = ev.target.closest('a');
+                    if (a && a.getAttribute('href')) {
+                        const href = a.getAttribute('href');
+                        if (!href.startsWith('http')) {
+                            ev.preventDefault();
+                            const [fileName, hash] = href.split('#');
+                            // 优先寻找具体锚点，其次寻找章节 ID
+                            const target = document.getElementById(hash) || document.getElementById(fileName);
+                            if (target) {
+                                target.scrollIntoView({ behavior: 'smooth' });
+                            }
+                        }
+                    }
+                });
+
+            } catch (err) {
+                console.error(err);
+                alert("读取文件失败，请确保它是标准的 EPUB 文件。");
+            }
+        };
+
+        // 辅助：处理 HTML 中的图片路径
+        function processHTML(html, baseDir) {
+            const doc = new DOMParser().parseFromString(html, "text/html");
+            
+            // 替换图片路径为内存地址
+            doc.querySelectorAll('img, image').forEach(img => {
+                const attr = img.tagName.toLowerCase() === 'img' ? 'src' : 'xlink:href';
+                const src = img.getAttribute(attr);
+                if (src) {
+                    const fullPath = normalizePath(baseDir + src);
+                    if (blobs[fullPath]) img.setAttribute(attr, blobs[fullPath]);
+                }
+            });
+
+            // 移除可能干扰的外部样式
+            doc.querySelectorAll('link[rel="stylesheet"], style').forEach(s => s.remove());
+            
+            return doc.body.innerHTML;
+        }
+
+        // 辅助：规范化路径处理 (a/b/../c -> a/c)
+        function normalizePath(path) {
+            const parts = path.split('/');
+            const stack = [];
+            for (let part of parts) {
+                if (part === '..') stack.pop();
+                else if (part !== '.' && part !== '') stack.push(part);
+            }
+            return stack.join('/');
+        }
+
+        async function findOPF(zip) {
+            const container = await zip.file("META-INF/container.xml").async("text");
+            const doc = new DOMParser().parseFromString(container, "text/xml");
+            return doc.getElementsByTagName("rootfile")[0].getAttribute("full-path");
+        }
+
+        function toggleTOC() {
+            const side = document.getElementById('sidebar');
+            side.style.display = side.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function toggleTheme() {
+            const body = document.body;
+            const current = body.getAttribute('data-theme');
+            body.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+        }
+    </script>
+</body>
+</html>
