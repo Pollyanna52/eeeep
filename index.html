@@ -98,7 +98,7 @@
         <div class="nav-bar">
             <button class="btn" onclick="toggleTOC()">☰ 目录</button>
             <button class="btn" onclick="toggleTheme()">🌓 模式</button>
-            <button class="btn" onclick="location.reload()">退出</button>
+            <button class="btn" onclick="location.href=location.pathname">退出</button>
             <span id="book-title" style="font-size: 14px; opacity: 0.6; margin-left: 10px;"></span>
         </div>
         
@@ -140,6 +140,11 @@
                 // 获取书名
                 const title = opfDoc.getElementsByTagName('dc:title')[0]?.textContent || "Unknown Title";
                 document.getElementById('book-title').innerText = title;
+
+                // 【新增代码】动态改变浏览器 URL 加上参数，防止荧光笔数据混淆
+                // 比如变成：https://yourname.github.io/reader/?book=三体
+                const safeTitle = encodeURIComponent(title.trim().replace(/\s+/g, '_'));
+                window.history.pushState({ book: safeTitle }, "", `?book=${safeTitle}`);
 
                 // 解析清单 (Manifest) 和 阅读顺序 (Spine)
                 const manifest = Array.from(opfDoc.getElementsByTagName('item'));
