@@ -146,6 +146,12 @@
                 const safeTitle = encodeURIComponent(title.trim().replace(/\s+/g, '_'));
                 window.history.pushState({ book: safeTitle }, "", `?book=${safeTitle}`);
 
+                // 1. 改变标签页的名字（网页标题）
+                document.title = title;
+
+// 2. 主动触发一个自定义的 popstate 事件，强制让暴力猴插件醒过来去读取新的 URL 
+                window.dispatchEvent(new PopStateEvent('popstate'));
+
                 // 解析清单 (Manifest) 和 阅读顺序 (Spine)
                 const manifest = Array.from(opfDoc.getElementsByTagName('item'));
                 const itemrefs = Array.from(opfDoc.getElementsByTagName('itemref'));
