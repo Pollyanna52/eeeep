@@ -106,8 +106,20 @@
         #content-area strong, #content-area b { color: var(--strong-color); }
         #content-area em, #content-area i { color: var(--em-color); }
 
-        #content-area img {
-            max-width: 100%; height: auto; display: block; margin: 20px auto;
+        /* EPUB 图片默认保持行内流，避免原本嵌在句子中的字形图片被强制挤到新行。 */
+        #content-area img, #content-area svg {
+            max-width: 100%; height: auto; vertical-align: baseline;
+        }
+        #content-area .epub-inline-image {
+            display: inline-block !important; max-width: 100%; height: auto;
+            margin: 0 !important; vertical-align: baseline;
+        }
+        #content-area .epub-image-block {
+            text-align: center; margin: 1.2em 0;
+        }
+        #content-area .epub-block-image {
+            display: block !important; max-width: 100%; height: auto;
+            margin: 0 auto !important;
         }
         #content-area h1, #content-area h2, #content-area h3,
         #content-area h4, #content-area h5, #content-area h6 {
@@ -138,6 +150,72 @@
         #content-area .diagram-error { color: #c64747; font-size: 13px; margin-bottom: 8px; }
         #content-area .chart-container { position: relative; width: 100%; height: 360px; margin: 1.5em 0; padding: 12px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 8px; background: var(--ui-bg); }
         #content-area .math-error { color: #c64747; font-size: 13px; }
+
+        /* 可选阅读主题：默认不启用，不影响原始阅读界面 */
+        body.theme-enabled {
+            isolation: isolate;
+            background-color: var(--theme-page-color, #242424);
+            color: var(--theme-text-color, #f7f3f5);
+        }
+        body.theme-enabled::before {
+            content: "";
+            position: fixed;
+            inset: -18px;
+            z-index: -1;
+            pointer-events: none;
+            background-image: var(--theme-bg-image, none);
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            filter: blur(var(--theme-bg-blur, 0px));
+            transform: scale(1.02);
+        }
+        body.theme-enabled .nav-bar {
+            background: rgba(25, 25, 29, .84);
+            color: #f5f5f5;
+            border-color: rgba(255,255,255,.16);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        body.theme-enabled #content-area {
+            box-sizing: border-box;
+            width: var(--theme-content-width, 80%);
+            max-width: 1100px;
+            padding: var(--theme-content-padding, clamp(24px, 4vw, 56px));
+            margin: 84px auto 100px;
+            color: var(--theme-text-color, #f7f3f5);
+            text-align: var(--theme-text-align, left);
+            text-indent: 0;
+            background: var(--theme-overlay, rgba(30, 24, 38, .42));
+            border: 1px solid rgba(255,255,255,.12);
+            border-radius: 12px;
+            box-shadow: 0 12px 44px rgba(0,0,0,.16);
+            backdrop-filter: blur(var(--theme-panel-blur, 0px));
+            -webkit-backdrop-filter: blur(var(--theme-panel-blur, 0px));
+        }
+        body.theme-enabled #content-area p { text-indent: var(--theme-first-indent, 0); }
+        body.theme-enabled #content-area strong,
+        body.theme-enabled #content-area b { color: var(--strong-color, #f4c1d9); }
+        body.theme-enabled #content-area em,
+        body.theme-enabled #content-area i { color: var(--em-color, #b9dcff); }
+        body.theme-enabled #content-area h1,
+        body.theme-enabled #content-area h2 { border-color: rgba(255,255,255,.25); }
+        body.theme-enabled #content-area blockquote { border-color: rgba(255,255,255,.45); }
+        body.theme-enabled #content-area pre,
+        body.theme-enabled #content-area th { background: rgba(20,20,24,.35); }
+        body.theme-enabled #content-area td,
+        body.theme-enabled #content-area th { border-color: rgba(255,255,255,.24); }
+        body.theme-enabled #content-area .diagram-wrap,
+        body.theme-enabled #content-area .chart-container { background: rgba(20,20,24,.48); }
+        .theme-upload-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .theme-upload-row input[type="file"] { max-width: 100%; font-size: 12px; }
+        .theme-status { font-size: 12px; opacity: .7; margin: 5px 0 0; overflow-wrap: anywhere; }
+        .theme-toggle-line { display:flex; align-items:center; gap:9px; margin: 12px 0 16px; font-size: 14px; }
+        .theme-toggle-line input { width: 18px; height: 18px; accent-color: #c52cc6; }
+        .theme-divider { border:0; border-top:1px solid var(--border); margin:14px 0; }
+        @media (max-width: 600px) {
+            body.theme-enabled #content-area { width: 94%; padding: 22px 18px; margin-top: 70px; border-radius: 8px; }
+        }
 
         /* 阅读排版面板 */
         .settings-panel {
@@ -200,6 +278,7 @@
             <button class="btn" onclick="toggleTOC()">☰ 目录</button>
             <button class="btn" onclick="toggleTheme()">🌓 模式</button>
             <button class="btn" onclick="toggleSettings()">Aa 排版</button>
+            <button class="btn" onclick="toggleThemeSettings()">🎨 主题</button>
             <button class="btn" onclick="location.href=location.pathname">退出</button>
             <span id="book-title" style="font-size: 14px; opacity: 0.6; margin-left: 10px;"></span>
         </div>
@@ -268,6 +347,87 @@
             </div>
             <p class="settings-note">设置会保存在当前浏览器中。字体选项取决于设备是否安装；未安装的字体会自动回退。</p>
         </aside>
+        <aside id="theme-panel" class="settings-panel theme-panel" hidden aria-label="阅读主题设置">
+            <div class="settings-header">
+                <h3>阅读主题</h3>
+                <button class="settings-close" type="button" aria-label="关闭主题设置" onclick="toggleThemeSettings(false)">×</button>
+            </div>
+            <label class="theme-toggle-line">
+                <input id="theme-enabled" type="checkbox">
+                <span>启用主题模式</span>
+            </label>
+            <p class="settings-note">关闭时完全使用原来的阅读样式。主题设置会单独保存，不会覆盖原有排版设置。</p>
+            <hr class="theme-divider">
+            <label class="setting-control">
+                <span class="setting-top">背景图片</span>
+                <div class="theme-upload-row">
+                    <input id="theme-background-image" type="file" accept="image/png,image/jpeg,image/webp,image/avif">
+                    <button class="btn" type="button" onclick="removeThemeBackground()">移除图片</button>
+                </div>
+                <p id="theme-background-status" class="theme-status">尚未选择背景图片</p>
+            </label>
+            <label class="setting-control">
+                <span class="setting-top">中文字体</span>
+                <select id="theme-cjk-font">
+                    <option value="'PingFang SC', 'Microsoft YaHei', sans-serif">系统黑体</option>
+                    <option value="'Songti SC', 'SimSun', serif">宋体 / 明朝体</option>
+                    <option value="'Microsoft YaHei', 'PingFang SC', sans-serif">微软雅黑优先</option>
+                    <option value="'Noto Sans CJK SC', 'Source Han Sans SC', sans-serif">思源黑体 / Noto Sans CJK</option>
+                    <option value="'Noto Serif CJK SC', 'Source Han Serif SC', serif">思源宋体 / Noto Serif CJK</option>
+                    <option value="'Kaiti SC', 'STKaiti', 'KaiTi', serif">楷体</option>
+                    <option value="serif">浏览器默认衬线体</option>
+                    <option value="sans-serif">浏览器默认无衬线体</option>
+                </select>
+            </label>
+            <label class="setting-control">
+                <span class="setting-top">英文字体</span>
+                <select id="theme-latin-font">
+                    <option value="system-ui, -apple-system, BlinkMacSystemFont, sans-serif">系统默认</option>
+                    <option value="Georgia, 'Times New Roman', serif">Georgia</option>
+                    <option value="'Times New Roman', Times, serif">Times New Roman</option>
+                    <option value="Arial, Helvetica, sans-serif">Arial</option>
+                    <option value="Verdana, Geneva, sans-serif">Verdana</option>
+                </select>
+            </label>
+            <div class="setting-colors">
+                <label class="setting-control">文字颜色<input id="theme-text-color" type="color" value="#f7f3f5"></label>
+                <label class="setting-control">底板颜色<input id="theme-overlay-color" type="color" value="#241d2d"></label>
+            </div>
+            <label class="setting-control">
+                <span class="setting-top"><span>底板不透明度</span><output id="theme-overlay-opacity-value">42%</output></span>
+                <input id="theme-overlay-opacity" type="range" min="0" max="95" step="1" value="42">
+            </label>
+            <label class="setting-control">
+                <span class="setting-top"><span>背景图片模糊度</span><output id="theme-bg-blur-value">0 px</output></span>
+                <input id="theme-bg-blur" type="range" min="0" max="20" step="1" value="0">
+            </label>
+            <label class="setting-control">
+                <span class="setting-top"><span>底板模糊度</span><output id="theme-panel-blur-value">0 px</output></span>
+                <input id="theme-panel-blur" type="range" min="0" max="24" step="1" value="0">
+            </label>
+            <label class="setting-control">
+                <span class="setting-top"><span>正文最大宽度</span><output id="theme-content-width-value">80%</output></span>
+                <input id="theme-content-width" type="range" min="55" max="100" step="1" value="80">
+            </label>
+            <label class="setting-control">
+                <span class="setting-top">文本对齐</span>
+                <select id="theme-text-align">
+                    <option value="left">左对齐</option>
+                    <option value="justify">两端对齐</option>
+                    <option value="center">居中</option>
+                    <option value="right">右对齐</option>
+                </select>
+            </label>
+            <label class="theme-toggle-line">
+                <input id="theme-first-indent" type="checkbox" checked>
+                <span>段首缩进两格</span>
+            </label>
+            <div class="settings-actions">
+                <button class="btn" type="button" onclick="resetThemeSettings()">重置主题</button>
+                <button class="btn" type="button" onclick="toggleThemeSettings(false)">完成</button>
+            </div>
+            <p class="settings-note">背景图会在本地缩放压缩后保存在当前浏览器中，不会上传到服务器。字体选项取决于设备是否安装。</p>
+        </aside>
     </div>
 
     <script>
@@ -279,6 +439,15 @@
             latinFont: 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
             fontSize: '18', lineHeight: '1.85', letterSpacing: '0', contentWidth: '820', paragraphGap: '0.9'
         };
+        const defaultThemeSettings = {
+            enabled: false,
+            backgroundImage: '',
+            cjkFont: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+            latinFont: 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+            textColor: '#f7f3f5', overlayColor: '#241d2d', overlayOpacity: '42',
+            bgBlur: '0', panelBlur: '0', contentWidth: '80', textAlign: 'left', firstIndent: true
+        };
+        let themeSettings = { ...defaultThemeSettings };
 
         const fileInput = document.getElementById('file-input');
         const uploadPage = document.getElementById('upload-page');
@@ -287,10 +456,15 @@
         const tocList = document.getElementById('toc-list');
         const sidebar = document.getElementById('sidebar');
         const settingsPanel = document.getElementById('settings-panel');
+        const themePanel = document.getElementById('theme-panel');
 
         initializeReaderSettings();
+        initializeThemeSettings();
         window.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape' && !settingsPanel.hidden) toggleSettings(false);
+            if (event.key === 'Escape') {
+                if (!settingsPanel.hidden) toggleSettings(false);
+                if (!themePanel.hidden) toggleThemeSettings(false);
+            }
         });
 
         fileInput.addEventListener('change', async (event) => {
@@ -327,6 +501,8 @@
             tocList.innerHTML = '';
             sidebar.style.display = 'none';
             settingsPanel.hidden = true;
+            themePanel.hidden = true;
+            document.body.classList.remove('theme-enabled');
             readerPage.style.display = 'none';
             uploadPage.style.display = 'flex';
         }
@@ -337,6 +513,7 @@
             readerPage.style.display = 'block';
             document.getElementById('book-title').innerText = title;
             document.title = title;
+            applyThemeSettings(false);
 
             // 保留书名参数，方便依赖 URL 的阅读辅助脚本区分不同文档。
             try {
@@ -440,17 +617,60 @@
         function processHTML(html, baseDir) {
             const doc = new DOMParser().parseFromString(html, 'text/html');
 
-            doc.querySelectorAll('img, image').forEach((img) => {
-                const attr = img.tagName.toLowerCase() === 'img' ? 'src' : 'xlink:href';
-                const src = img.getAttribute(attr);
-                if (src) {
-                    const fullPath = normalizePath(baseDir + src.split('#')[0]);
-                    if (blobs[fullPath]) img.setAttribute(attr, blobs[fullPath]);
+            // 将 EPUB 图片资源映射到本地 Blob URL，同时保留它们原本的行内/块级语义。
+            doc.querySelectorAll('img, image').forEach((imageNode) => {
+                const attr = imageNode.tagName.toLowerCase() === 'img' ? 'src' : 'xlink:href';
+                const src = imageNode.getAttribute(attr) || imageNode.getAttribute('href');
+                if (src && !/^(?:[a-z][a-z0-9+.-]*:|\/\/|data:)/i.test(src)) {
+                    let decodedSrc = src.split(/[?#]/)[0];
+                    try { decodedSrc = decodeURIComponent(decodedSrc); } catch (_) {}
+                    const fullPath = normalizePath(baseDir + decodedSrc);
+                    if (blobs[fullPath]) imageNode.setAttribute(attr, blobs[fullPath]);
                 }
             });
 
-            // 与原版一致，避免 EPUB 自带的样式表覆盖阅读器主题。
-            doc.querySelectorAll('link[rel="stylesheet"], style').forEach((element) => element.remove());
+            // 许多 EPUB 会用 SVG <image> 包装特殊字形；按外层 SVG 作为一个整体处理。
+            const visualNodes = new Set();
+            doc.querySelectorAll('img, image').forEach((node) => {
+                visualNodes.add(node.closest('svg') || node);
+            });
+
+            visualNodes.forEach((visual) => {
+                const textContainer = visual.closest('p, h1, h2, h3, h4, h5, h6, li, td, th, blockquote, div');
+                if (!textContainer) return;
+
+                // 克隆段落并移除当前图片。若仍有文字，图片就是句子中的行内内容。
+                const clone = textContainer.cloneNode(true);
+                // 根据 DOM 路径在克隆段落中定位同一张图片，避免段落里有多张图片时误删其他图片。
+                const childPath = [];
+                let cursor = visual;
+                while (cursor && cursor !== textContainer) {
+                    const parent = cursor.parentNode;
+                    if (!parent) break;
+                    childPath.unshift(Array.prototype.indexOf.call(parent.childNodes, cursor));
+                    cursor = parent;
+                }
+                let clonedVisual = clone;
+                childPath.forEach((index) => {
+                    clonedVisual = clonedVisual && clonedVisual.childNodes[index];
+                });
+                if (clonedVisual && clonedVisual !== clone) clonedVisual.remove();
+
+                const hasNeighbourText = Boolean((clone.textContent || '').replace(/\s+/g, '').trim());
+                const hasInlineParent = visual.parentElement && /^(A|SPAN|EM|STRONG|B|I|SUP|SUB)$/i.test(visual.parentElement.tagName);
+
+                if (hasNeighbourText || hasInlineParent) {
+                    visual.classList.add('epub-inline-image');
+                } else {
+                    visual.classList.add('epub-block-image');
+                    if (/^(P|DIV|BLOCKQUOTE)$/i.test(textContainer.tagName)) {
+                        textContainer.classList.add('epub-image-block');
+                    }
+                }
+            });
+
+            // 不再把所有图片统一设为 block。行内字形图会跟随句子排版，独立插图仍保持居中块级显示。
+            // EPUB 原始的内联 style 保留，避免破坏 width、height、vertical-align 等图片定位信息。
             return doc.body.innerHTML;
         }
 
@@ -581,6 +801,7 @@
         function toggleSettings(forceOpen) {
             const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : settingsPanel.hidden;
             settingsPanel.hidden = !shouldOpen;
+            if (shouldOpen) themePanel.hidden = true;
         }
 
         function initializeReaderSettings() {
@@ -645,6 +866,11 @@
             if (italic.dataset.customized === 'true') area.style.setProperty('--em-color', italic.value);
             else area.style.removeProperty('--em-color');
 
+            if (themeSettings.enabled) {
+                area.style.setProperty('--cjk-font', themeSettings.cjkFont);
+                area.style.setProperty('--latin-font', themeSettings.latinFont);
+            }
+
             if (save) {
                 const saved = { ...values };
                 if (bold.dataset.customized === 'true') saved.strongColor = bold.value;
@@ -666,6 +892,204 @@
             });
             try { localStorage.removeItem('nativeReaderSettings'); } catch (_) {}
             applyReaderSettings(false);
+        }
+
+        function initializeThemeSettings() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('nativeReaderTheme') || '{}');
+                if (saved && typeof saved === 'object') themeSettings = { ...defaultThemeSettings, ...saved };
+            } catch (_) {
+                themeSettings = { ...defaultThemeSettings };
+            }
+
+            const values = {
+                'theme-enabled': ['enabled', 'checked'],
+                'theme-cjk-font': ['cjkFont', 'value'],
+                'theme-latin-font': ['latinFont', 'value'],
+                'theme-text-color': ['textColor', 'value'],
+                'theme-overlay-color': ['overlayColor', 'value'],
+                'theme-overlay-opacity': ['overlayOpacity', 'value'],
+                'theme-bg-blur': ['bgBlur', 'value'],
+                'theme-panel-blur': ['panelBlur', 'value'],
+                'theme-content-width': ['contentWidth', 'value'],
+                'theme-text-align': ['textAlign', 'value'],
+                'theme-first-indent': ['firstIndent', 'checked']
+            };
+            Object.entries(values).forEach(([id, [key, property]]) => {
+                const el = document.getElementById(id);
+                if (el) el[property] = property === 'checked' ? Boolean(themeSettings[key]) : String(themeSettings[key]);
+            });
+
+            themePanel.querySelectorAll('select, input[type="range"], input[type="color"], input[type="checkbox"]').forEach((el) => {
+                el.addEventListener('input', () => collectAndApplyThemeSettings(true));
+                el.addEventListener('change', () => collectAndApplyThemeSettings(true));
+            });
+            document.getElementById('theme-background-image').addEventListener('change', handleThemeBackgroundUpload);
+            updateThemeReadouts();
+            applyThemeSettings(false);
+            updateThemeBackgroundStatus();
+        }
+
+        function toggleThemeSettings(forceOpen) {
+            const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : themePanel.hidden;
+            themePanel.hidden = !shouldOpen;
+            if (shouldOpen) settingsPanel.hidden = true;
+        }
+
+        function collectAndApplyThemeSettings(save) {
+            const get = (id) => document.getElementById(id);
+            themeSettings = {
+                ...themeSettings,
+                enabled: get('theme-enabled').checked,
+                cjkFont: get('theme-cjk-font').value,
+                latinFont: get('theme-latin-font').value,
+                textColor: get('theme-text-color').value,
+                overlayColor: get('theme-overlay-color').value,
+                overlayOpacity: get('theme-overlay-opacity').value,
+                bgBlur: get('theme-bg-blur').value,
+                panelBlur: get('theme-panel-blur').value,
+                contentWidth: get('theme-content-width').value,
+                textAlign: get('theme-text-align').value,
+                firstIndent: get('theme-first-indent').checked
+            };
+            applyThemeSettings(save);
+        }
+
+        function colorToRgba(hex, alpha) {
+            const normalized = String(hex || '#241d2d').replace('#', '');
+            const full = normalized.length === 3 ? normalized.split('').map((x) => x + x).join('') : normalized;
+            const value = parseInt(full, 16);
+            if (!Number.isFinite(value)) return `rgba(36, 29, 45, ${alpha})`;
+            const r = (value >> 16) & 255;
+            const g = (value >> 8) & 255;
+            const b = value & 255;
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
+        function applyThemeSettings(save) {
+            const root = document.documentElement;
+            const enabled = Boolean(themeSettings.enabled);
+            document.body.classList.toggle('theme-enabled', enabled && currentFormat !== '');
+            root.style.setProperty('--theme-page-color', '#24242a');
+            root.style.setProperty('--theme-bg-image', themeSettings.backgroundImage ? `url("${themeSettings.backgroundImage}")` : 'none');
+            root.style.setProperty('--theme-text-color', themeSettings.textColor || '#f7f3f5');
+            root.style.setProperty('--theme-overlay', colorToRgba(themeSettings.overlayColor, Math.max(0, Math.min(95, Number(themeSettings.overlayOpacity))) / 100));
+            root.style.setProperty('--theme-bg-blur', `${Math.max(0, Number(themeSettings.bgBlur) || 0)}px`);
+            root.style.setProperty('--theme-panel-blur', `${Math.max(0, Number(themeSettings.panelBlur) || 0)}px`);
+            root.style.setProperty('--theme-content-width', `${Math.max(55, Math.min(100, Number(themeSettings.contentWidth) || 80))}%`);
+            root.style.setProperty('--theme-text-align', themeSettings.textAlign || 'left');
+            root.style.setProperty('--theme-first-indent', themeSettings.firstIndent ? '2em' : '0');
+            if (enabled) {
+                contentArea.style.setProperty('--cjk-font', themeSettings.cjkFont);
+                contentArea.style.setProperty('--latin-font', themeSettings.latinFont);
+            } else {
+                applyReaderSettings(false);
+            }
+            updateThemeReadouts();
+            updateThemeBackgroundStatus();
+            if (save) {
+                try {
+                    localStorage.setItem('nativeReaderTheme', JSON.stringify(themeSettings));
+                } catch (error) {
+                    console.warn('主题设置无法完整保存：', error);
+                    alert('主题设置已应用，但浏览器存储空间不足，无法保存背景图片。请换一张较小的图片后重试。');
+                }
+            }
+        }
+
+        function updateThemeReadouts() {
+            const set = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+            set('theme-overlay-opacity-value', `${themeSettings.overlayOpacity ?? 42}%`);
+            set('theme-bg-blur-value', `${themeSettings.bgBlur ?? 0} px`);
+            set('theme-panel-blur-value', `${themeSettings.panelBlur ?? 0} px`);
+            set('theme-content-width-value', `${themeSettings.contentWidth ?? 80}%`);
+        }
+
+        function updateThemeBackgroundStatus() {
+            const status = document.getElementById('theme-background-status');
+            if (!status) return;
+            status.textContent = themeSettings.backgroundImage ? '已添加背景图片（保存在当前浏览器）' : '尚未选择背景图片';
+        }
+
+        async function handleThemeBackgroundUpload(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+            if (!file.type.startsWith('image/')) {
+                alert('请选择图片文件。');
+                event.target.value = '';
+                return;
+            }
+            try {
+                const dataUrl = await compressThemeImage(file);
+                themeSettings.backgroundImage = dataUrl;
+                collectAndApplyThemeSettings(true);
+                // 选图即启用，避免用户误以为图片没有生效；仍可随时关闭主题模式。
+                if (!themeSettings.enabled) {
+                    themeSettings.enabled = true;
+                    document.getElementById('theme-enabled').checked = true;
+                    applyThemeSettings(true);
+                }
+            } catch (error) {
+                console.error('背景图片处理失败：', error);
+                alert('图片读取失败，请尝试使用 JPG、PNG 或 WebP 图片。');
+            }
+            event.target.value = '';
+        }
+
+        function compressThemeImage(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onerror = () => reject(new Error('无法读取图片'));
+                reader.onload = () => {
+                    const image = new Image();
+                    image.onerror = () => reject(new Error('无法解码图片'));
+                    image.onload = () => {
+                        const maxSide = 2000;
+                        const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+                        const canvas = document.createElement('canvas');
+                        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+                        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+                        const context = canvas.getContext('2d');
+                        if (!context) return reject(new Error('浏览器不支持图片处理'));
+                        context.fillStyle = '#24242a';
+                        context.fillRect(0, 0, canvas.width, canvas.height);
+                        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+                        try { resolve(canvas.toDataURL('image/jpeg', 0.84)); }
+                        catch (error) { reject(error); }
+                    };
+                    image.src = String(reader.result);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function removeThemeBackground() {
+            themeSettings.backgroundImage = '';
+            document.getElementById('theme-background-image').value = '';
+            applyThemeSettings(true);
+        }
+
+        function resetThemeSettings() {
+            themeSettings = { ...defaultThemeSettings };
+            const map = {
+                'theme-enabled': ['enabled', 'checked'],
+                'theme-cjk-font': ['cjkFont', 'value'],
+                'theme-latin-font': ['latinFont', 'value'],
+                'theme-text-color': ['textColor', 'value'],
+                'theme-overlay-color': ['overlayColor', 'value'],
+                'theme-overlay-opacity': ['overlayOpacity', 'value'],
+                'theme-bg-blur': ['bgBlur', 'value'],
+                'theme-panel-blur': ['panelBlur', 'value'],
+                'theme-content-width': ['contentWidth', 'value'],
+                'theme-text-align': ['textAlign', 'value'],
+                'theme-first-indent': ['firstIndent', 'checked']
+            };
+            Object.entries(map).forEach(([id, [key, property]]) => {
+                document.getElementById(id)[property] = property === 'checked' ? Boolean(themeSettings[key]) : String(themeSettings[key]);
+            });
+            document.getElementById('theme-background-image').value = '';
+            try { localStorage.removeItem('nativeReaderTheme'); } catch (_) {}
+            applyThemeSettings(false);
         }
 
         async function enhanceMarkdownContent(container) {
